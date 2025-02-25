@@ -14,7 +14,7 @@ const isUserExist = async (field: any) => {
 };
 
 export const createUser = async (req: Request, res: Response) => {
-  const { email, password, username } = req.body;
+  const { email, password, name } = req.body; // Use 'name' instead of 'username'
 
   try {
     const existingUser = await isUserExist({ email });
@@ -30,7 +30,17 @@ export const createUser = async (req: Request, res: Response) => {
     const hashedPass = await bcrypt.hash(password, saltRounds);
 
     const newUser = await prisma.user.create({
-      data: { email, password: hashedPass, username },
+      data: {
+        email,
+        password: hashedPass,
+        name, // Use 'name' as provided by the user
+        profile: {
+          create: {
+            image: "", // You can set a default image or leave it empty
+            about: "", // Optionally, allow this to be optional or passed in
+          },
+        },
+      },
     });
 
     const refreshToken = jwt.sign(
@@ -61,7 +71,7 @@ export const createUser = async (req: Request, res: Response) => {
 export const fetchUsers = async (req: Request, res: Response) => {
   try {
     const users = await prisma.user.findMany({
-      select: { id: true, email: true },
+      select: { id: true, email: true, name: true }, // Select name as well
     });
 
     res.json({

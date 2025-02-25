@@ -1,23 +1,22 @@
 import { Request, Response } from "express";
-import { prisma } from "../../prismaClient"; 
+import { PrismaClient } from "@prisma/client";
+
+const prisma = new PrismaClient();
 
 export const createProfile = async (req: Request, res: Response) => {
-  const { id } = req.params;
-  const { name, about, avatarImage, socialMediaURL } = req.body;
-
-  // Validate incoming data
-  if (!name || !avatarImage) {
+  const userId = parseInt(req.params.id); 
+  const { image, about } = req.body;
+  if (!image) {
     return res.status(400).json({
       success: false,
       code: "VALIDATION_ERROR",
-      message: "All fields (name,avatarImage) are required.",
+      message: "Profile image is required.",
     });
   }
 
   try {
-    // Check if the user exists before creating a profile
     const user = await prisma.user.findUnique({
-      where: { id },
+      where: { id: userId },
     });
 
     if (!user) {
@@ -30,9 +29,9 @@ export const createProfile = async (req: Request, res: Response) => {
 
     const newProfile = await prisma.profile.create({
       data: {
-        name,
-        avatarImage,
-        userId: id,
+        image,
+        about,
+        userId,
       },
     });
 

@@ -13,7 +13,7 @@ export const signinController = async (req: Request, res: Response) => {
     // Check if the user exists
     const user = await prisma.user.findUnique({
       where: { email },
-      include: { profile: true, bankCard: true },
+      include: { profile: true }, // Removed bankCard from include
     });
 
     if (!user) {
@@ -41,7 +41,7 @@ export const signinController = async (req: Request, res: Response) => {
       { expiresIn: "24h" }
     );
 
-    const accessToken = generateAccessToken(user.id);
+    const accessToken = generateAccessToken(user.id.toString());
 
     const { password: _, ...userWithoutPassword } = user;
 

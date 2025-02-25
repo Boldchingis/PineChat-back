@@ -6,13 +6,13 @@ import nodemailer from "nodemailer";
 import dotenv from "dotenv";
 
 dotenv.config();
-
 const prisma = new PrismaClient();
 
-// Rate Limiter (3 OTP requests per 5 minutes)
+// ✅ Rate Limiter (3 OTP requests per 5 minutes per email)
 const otpLimiter = rateLimit({
-  windowMs: 5 * 60 * 1000, // 5 minutes
-  max: 3, // Limit each IP to 3 OTP requests per window
+  windowMs: 5 * 60 * 1000, 
+  max: 3, 
+  keyGenerator: (req) => req.body.email, // ✅ Limit by email instead of IP
   message: "Too many OTP requests. Please try again later.",
 });
 
@@ -27,9 +27,20 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-// Generate a secure OTP
+// ✅ Generate a secure OTP
 const generateOtp = () => Math.floor(100000 + Math.random() * 900000);
 
+// ✅ Function to clean expired OTPs every hour
+const cleanupExpiredOtps = async () => {
+  await prisma.otp.deleteMany({
+    where: {
+      expiresAt: { lt: new Date() },
+    },
+  });
+};
+setInterval(cleanupExpiredOtps, 60 * 60 * 1000); // Run every hour
+
+// ✅ Forgot Password (Send OTP)
 export const forgotPassword = async (req: Request, res: Response) => {
   const { email } = req.body;
 
@@ -48,7 +59,7 @@ export const forgotPassword = async (req: Request, res: Response) => {
     const hashedOtp = await bcrypt.hash(otp.toString(), 10);
 
     await prisma.otp.create({
-      data: { email, otp: hashedOtp, createdAt: new Date() },
+      data: { email, otp: hashedOtp, createdAt: new Date(), expiresAt: new Date(Date.now() + 5 * 60000) },
     });
 
     await transporter.sendMail({
@@ -79,20 +90,11 @@ export const forgotPassword = async (req: Request, res: Response) => {
   }
 };
 
-export const requestOTP = async (req: Request, res: Response) => {
+// ✅ Verify OTP
+export const verifyOTP = async (req: Request, res: Response) => {
   const { email, userOtp } = req.body;
 
   try {
-    const user = await prisma.user.findUnique({ where: { email } });
-
-    if (!user) {
-      return res.status(404).json({
-        code: "USER_NOT_FOUND",
-        message: "User doesn't exist",
-        success: false,
-      });
-    }
-
     const otpRecord = await prisma.otp.findFirst({
       where: { email },
       orderBy: { createdAt: "desc" },
@@ -106,8 +108,9 @@ export const requestOTP = async (req: Request, res: Response) => {
       });
     }
 
-    const otpAge = (new Date().getTime() - otpRecord.createdAt.getTime()) / 1000 / 60;
-    if (otpAge > 5) {
+    // ✅ Check if OTP has expired
+    if (otpRecord.expiresAt < new Date()) {
+      await prisma.otp.delete({ where: { id: otpRecord.id } });
       return res.status(400).json({
         code: "OTP_EXPIRED",
         message: "OTP has expired",
@@ -115,6 +118,7 @@ export const requestOTP = async (req: Request, res: Response) => {
       });
     }
 
+    // ✅ Validate OTP
     const isOtpValid = await bcrypt.compare(userOtp.toString(), otpRecord.otp);
     if (!isOtpValid) {
       return res.status(400).json({
@@ -123,6 +127,9 @@ export const requestOTP = async (req: Request, res: Response) => {
         success: false,
       });
     }
+
+    // ✅ Delete OTP after successful verification
+    await prisma.otp.delete({ where: { id: otpRecord.id } });
 
     res.json({
       code: "OTP_VERIFIED",
@@ -139,5 +146,5 @@ export const requestOTP = async (req: Request, res: Response) => {
   }
 };
 
-// Apply rate limiter to OTP request
+// ✅ Apply rate limiter to OTP request
 export { otpLimiter };

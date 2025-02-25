@@ -8,30 +8,48 @@ datasource db {
 }
 
 model User {
-  id       Int    @id @default(autoincrement())
-  email    String @unique
+  id       Int     @id @default(autoincrement())
+  email    String  @unique
   password String
   name     String?
-
-  sentMessages    Message[] @relation("SenderMessages")
-  receivedMessages Message[] @relation("ReceiverMessages")
+  profile  Profile?
+  sentMessages Message[] @relation("SenderMessages")
+  chats        Chat[]     @relation("UserChats")
 }
 
 model Chat {
-  id       Int       @id @default(autoincrement())
-  name     String
-  messages Message[]
+  id          Int      @id @default(autoincrement())
+  name        String?
+  isGroup     Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  messages    Message[]
+  participants User[]  @relation("UserChats")
 }
 
 model Message {
-  id         Int      @id @default(autoincrement())
-  content    String
-  senderId   Int
-  receiverId Int
-  chatId     Int
-  createdAt  DateTime @default(now())
+  id        Int      @id @default(autoincrement())
+  content   String
+  senderId  Int
+  chatId    Int
+  createdAt DateTime @default(now())
 
-  sender     User @relation("SenderMessages", fields: [senderId], references: [id])
-  receiver   User @relation("ReceiverMessages", fields: [receiverId], references: [id])
-  chat       Chat @relation(fields: [chatId], references: [id])
+  sender    User @relation("SenderMessages", fields: [senderId], references: [id])
+  chat      Chat @relation(fields: [chatId], references: [id])
+}
+
+model Profile {
+  id     Int    @id @default(autoincrement())
+  image  String
+  about String?
+  userId Int    @unique
+  user   User   @relation(fields: [userId], references: [id])
+}
+
+model Otp {
+  id        String   @id @default(nanoid())
+  email     String
+  otp       String   // Store hashed OTP as a string
+  createdAt DateTime @default(now())
+  expiresAt DateTime
 }
