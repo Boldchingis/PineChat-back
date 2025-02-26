@@ -49,7 +49,7 @@ export const createUser = async (req: Request, res: Response) => {
       { expiresIn: "24h" }
     );
 
-    const accessToken = generateAccessToken(newUser.id);
+    const accessToken = generateAccessToken(newUser.id.toString());
 
     res.status(201).json({
       success: true,
