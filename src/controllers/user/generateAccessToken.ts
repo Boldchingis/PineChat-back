@@ -5,4 +5,5 @@ export const generateAccessToken = (userId: string) => {
     expiresIn: "4h",
   });
   return token;
+
 };

@@ -10,12 +10,13 @@ const prisma = new PrismaClient();
 
 // ✅ Rate Limiter (3 OTP requests per 5 minutes per email)
 const otpLimiter = rateLimit({
-  windowMs: 5 * 60 * 1000, 
-  max: 3, 
+  windowMs: 5 * 60 * 1000,
+  max: 3,
   keyGenerator: (req) => req.body.email, // ✅ Limit by email instead of IP
   message: "Too many OTP requests. Please try again later.",
 });
 
+// ✅ Nodemailer Transporter
 const transporter = nodemailer.createTransport({
   service: "Gmail",
   host: "smtp.gmail.com",
@@ -32,27 +33,32 @@ const generateOtp = () => Math.floor(100000 + Math.random() * 900000);
 
 // ✅ Function to clean expired OTPs every hour
 const cleanupExpiredOtps = async () => {
-  await prisma.otp.deleteMany({
-    where: {
-      expiresAt: { lt: new Date() },
-    },
-  });
+  try {
+    await prisma.otp.deleteMany({
+      where: {
+        expiresAt: { lt: new Date() },
+      },
+    });
+  } catch (error) {
+    console.error("Error cleaning up expired OTPs:", error);
+  }
 };
 setInterval(cleanupExpiredOtps, 60 * 60 * 1000); // Run every hour
 
 // ✅ Forgot Password (Send OTP)
-export const forgotPassword = async (req: Request, res: Response) => {
+export const forgotPassword = async (req: Request, res: Response): Promise<void> => {
   const { email } = req.body;
 
   try {
     const user = await prisma.user.findUnique({ where: { email } });
 
     if (!user) {
-      return res.status(404).json({
+      res.status(404).json({
         code: "USER_NOT_FOUND",
         message: "User doesn't exist",
         success: false,
       });
+      return;
     }
 
     const otp = generateOtp();
@@ -91,7 +97,7 @@ export const forgotPassword = async (req: Request, res: Response) => {
 };
 
 // ✅ Verify OTP
-export const verifyOTP = async (req: Request, res: Response) => {
+export const verifyOTP = async (req: Request, res: Response): Promise<void> => {
   const { email, userOtp } = req.body;
 
   try {
@@ -101,35 +107,38 @@ export const verifyOTP = async (req: Request, res: Response) => {
     });
 
     if (!otpRecord) {
-      return res.status(400).json({
+      res.status(400).json({
         code: "OTP_NOT_FOUND",
         message: "No OTP found for this email",
         success: false,
       });
+      return;
     }
 
     // ✅ Check if OTP has expired
     if (otpRecord.expiresAt < new Date()) {
-      await prisma.otp.delete({ where: { id: otpRecord.id } });
-      return res.status(400).json({
+      await prisma.otp.deleteMany({ where: { email } }); // ✅ Ensure expired OTPs are deleted
+      res.status(400).json({
         code: "OTP_EXPIRED",
         message: "OTP has expired",
         success: false,
       });
+      return;
     }
 
     // ✅ Validate OTP
     const isOtpValid = await bcrypt.compare(userOtp.toString(), otpRecord.otp);
     if (!isOtpValid) {
-      return res.status(400).json({
+      res.status(400).json({
         code: "OTP_INCORRECT",
         message: "Incorrect OTP",
         success: false,
       });
+      return;
     }
 
     // ✅ Delete OTP after successful verification
-    await prisma.otp.delete({ where: { id: otpRecord.id } });
+    await prisma.otp.deleteMany({ where: { email } });
 
     res.json({
       code: "OTP_VERIFIED",

@@ -1,22 +1,22 @@
 import { Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcrypt";
-import { nanoid } from "nanoid";  // To generate OTPs, you can use nanoid
 
 const prisma = new PrismaClient();
 
-export const resetPassword = async (req: Request, res: Response) => {
+export const resetPassword = async (req: Request, res: Response): Promise<void> => {
   const { email, newPassword, otp } = req.body;
 
   try {
     // Step 1: Check if user exists
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user) {
-      return res.status(404).json({
+      res.status(404).json({
         success: false,
         code: "USER_NOT_FOUND",
         message: "User does not exist.",
       });
+      return;  // Ensure control returns after the response
     }
 
     // Step 2: Verify OTP
@@ -26,32 +26,37 @@ export const resetPassword = async (req: Request, res: Response) => {
     });
 
     if (!otpRecord) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         code: "INVALID_OTP",
         message: "Invalid OTP.",
       });
+      return;  // Ensure control returns after the response
     }
 
+    // Step 3: Check if OTP has expired
     if (otpRecord.expiresAt < new Date()) {
-      return res.status(400).json({
+      // Delete expired OTP record for clean-up
+      await prisma.otp.deleteMany({ where: { email } });
+      res.status(400).json({
         success: false,
         code: "OTP_EXPIRED",
         message: "OTP has expired.",
       });
+      return;  // Ensure control returns after the response
     }
 
-    // Step 3: Hash the new password
+    // Step 4: Hash the new password
     const saltRounds = 10;
     const hashedPass = await bcrypt.hash(newPassword, saltRounds);
 
-    // Step 4: Update user password
+    // Step 5: Update the user password
     await prisma.user.update({
       where: { email },
       data: { password: hashedPass },
     });
 
-    // Step 5: Optionally delete the OTP record after successful use
+    // Step 6: Optionally delete OTP record after successful password reset
     await prisma.otp.deleteMany({ where: { email } });
 
     res.status(200).json({

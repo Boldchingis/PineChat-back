@@ -3,54 +3,60 @@ import { PrismaClient } from "@prisma/client";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 import dotenv from "dotenv";
-import { generateAccessToken } from "./generateAccessToken";
+import { generateAccessToken } from "./generateAccessToken"; // Ensure this function is correctly implemented
 
 dotenv.config();
 const prisma = new PrismaClient();
 const saltRounds = 10;
 
+// Check if a user exists based on a specific field
 const isUserExist = async (field: any) => {
   return await prisma.user.findUnique({ where: field });
 };
 
-export const createUser = async (req: Request, res: Response) => {
-  const { email, password, name } = req.body; // Use 'name' instead of 'username'
+export const createUser = async (req: Request, res: Response): Promise<void> => {
+  const { email, password, name } = req.body; // 'name' instead of 'username'
 
   try {
+    // Check if user already exists
     const existingUser = await isUserExist({ email });
-
     if (existingUser) {
-      return res.status(409).json({
+      res.status(409).json({
         success: false,
         code: "USER_ALREADY_EXISTS",
         message: "User already exists",
       });
+      return;
     }
 
+    // Hash the password before saving
     const hashedPass = await bcrypt.hash(password, saltRounds);
 
+    // Create new user and profile
     const newUser = await prisma.user.create({
       data: {
         email,
         password: hashedPass,
-        name, // Use 'name' as provided by the user
+        name,
         profile: {
           create: {
-            image: "", // You can set a default image or leave it empty
+            image: "", // Default or empty image
             about: "", // Optionally, allow this to be optional or passed in
           },
         },
       },
     });
 
+    // Handle JWT Token creation
     const refreshToken = jwt.sign(
       { userId: newUser.id },
-      process.env.REFRESH_TOKEN_SECRET || "default_secret",
+      process.env.REFRESH_TOKEN_SECRET || "default_secret", // Ensure the secret is set in env
       { expiresIn: "24h" }
     );
 
-    const accessToken = generateAccessToken(newUser.id.toString());
+    const accessToken = generateAccessToken(newUser.id.toString()); // Ensure this function works
 
+    // Respond with success message and tokens
     res.status(201).json({
       success: true,
       code: "SUCCESS",
@@ -68,10 +74,11 @@ export const createUser = async (req: Request, res: Response) => {
   }
 };
 
-export const fetchUsers = async (req: Request, res: Response) => {
+export const fetchUsers = async (req: Request, res: Response): Promise<void> => {
   try {
+    // Fetch all users' basic information
     const users = await prisma.user.findMany({
-      select: { id: true, email: true, name: true }, // Select name as well
+      select: { id: true, email: true, name: true }, // Select the necessary fields
     });
 
     res.json({

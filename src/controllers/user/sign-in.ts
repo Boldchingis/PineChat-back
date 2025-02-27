@@ -6,7 +6,7 @@ import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
-export const signinController = async (req: Request, res: Response) => {
+export const signinController = async (req: Request, res: Response): Promise<void> => {
   const { email, password } = req.body;
 
   try {
@@ -17,21 +17,23 @@ export const signinController = async (req: Request, res: Response) => {
     });
 
     if (!user) {
-      return res.status(404).json({
+      res.status(404).json({
         success: false,
         code: "USER_NOT_FOUND",
         message: "User does not exist.",
       });
+      return;
     }
 
     // Compare passwords
     const isValid = await bcrypt.compare(password, user.password);
     if (!isValid) {
-      return res.status(401).json({
+      res.status(401).json({
         success: false,
         code: "PASSWORD_INCORRECT",
         message: "Incorrect password.",
       });
+      return;
     }
 
     // Generate tokens

@@ -56,4 +56,5 @@ export const getTokenController = (req: Request, res: Response) => {
       message: "Invalid or expired refresh token.",
     });
   }
+  console.log(refreshToken);
 };
