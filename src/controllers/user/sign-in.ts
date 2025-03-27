@@ -6,14 +6,16 @@ import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
-export const signinController = async (req: Request, res: Response): Promise<void> => {
+export const signinController = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
   const { email, password } = req.body;
 
   try {
-    // Check if the user exists
     const user = await prisma.user.findUnique({
       where: { email },
-      include: { profile: true }, // Removed bankCard from include
+      include: { profile: true },
     });
 
     if (!user) {
@@ -24,8 +26,6 @@ export const signinController = async (req: Request, res: Response): Promise<voi
       });
       return;
     }
-
-    // Compare passwords
     const isValid = await bcrypt.compare(password, user.password);
     if (!isValid) {
       res.status(401).json({
@@ -35,8 +35,6 @@ export const signinController = async (req: Request, res: Response): Promise<voi
       });
       return;
     }
-
-    // Generate tokens
     const refreshToken = jwt.sign(
       { userId: user.id },
       process.env.REFRESH_TOKEN_SECRET || "default_refresh_secret",

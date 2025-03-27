@@ -8,15 +8,13 @@ import dotenv from "dotenv";
 dotenv.config();
 const prisma = new PrismaClient();
 
-// ✅ Rate Limiter (3 OTP requests per 5 minutes per email)
 const otpLimiter = rateLimit({
   windowMs: 5 * 60 * 1000,
   max: 3,
-  keyGenerator: (req) => req.body.email, // ✅ Limit by email instead of IP
+  keyGenerator: (req) => req.body.email,
   message: "Too many OTP requests. Please try again later.",
 });
 
-// ✅ Nodemailer Transporter
 const transporter = nodemailer.createTransport({
   service: "Gmail",
   host: "smtp.gmail.com",
@@ -28,10 +26,8 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-// ✅ Generate a secure OTP
 const generateOtp = () => Math.floor(100000 + Math.random() * 900000);
 
-// ✅ Function to clean expired OTPs every hour
 const cleanupExpiredOtps = async () => {
   try {
     await prisma.otp.deleteMany({
@@ -43,10 +39,11 @@ const cleanupExpiredOtps = async () => {
     console.error("Error cleaning up expired OTPs:", error);
   }
 };
-setInterval(cleanupExpiredOtps, 60 * 60 * 1000); // Run every hour
-
-// ✅ Forgot Password (Send OTP)
-export const forgotPassword = async (req: Request, res: Response): Promise<void> => {
+setInterval(cleanupExpiredOtps, 60 * 60 * 1000);
+export const forgotPassword = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
   const { email } = req.body;
 
   try {
@@ -65,7 +62,12 @@ export const forgotPassword = async (req: Request, res: Response): Promise<void>
     const hashedOtp = await bcrypt.hash(otp.toString(), 10);
 
     await prisma.otp.create({
-      data: { email, otp: hashedOtp, createdAt: new Date(), expiresAt: new Date(Date.now() + 5 * 60000) },
+      data: {
+        email,
+        otp: hashedOtp,
+        createdAt: new Date(),
+        expiresAt: new Date(Date.now() + 5 * 60000),
+      },
     });
 
     await transporter.sendMail({
@@ -114,10 +116,8 @@ export const verifyOTP = async (req: Request, res: Response): Promise<void> => {
       });
       return;
     }
-
-    // ✅ Check if OTP has expired
     if (otpRecord.expiresAt < new Date()) {
-      await prisma.otp.deleteMany({ where: { email } }); // ✅ Ensure expired OTPs are deleted
+      await prisma.otp.deleteMany({ where: { email } });
       res.status(400).json({
         code: "OTP_EXPIRED",
         message: "OTP has expired",
@@ -126,7 +126,6 @@ export const verifyOTP = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    // ✅ Validate OTP
     const isOtpValid = await bcrypt.compare(userOtp.toString(), otpRecord.otp);
     if (!isOtpValid) {
       res.status(400).json({
@@ -136,8 +135,6 @@ export const verifyOTP = async (req: Request, res: Response): Promise<void> => {
       });
       return;
     }
-
-    // ✅ Delete OTP after successful verification
     await prisma.otp.deleteMany({ where: { email } });
 
     res.json({

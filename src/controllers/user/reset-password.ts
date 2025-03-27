@@ -4,11 +4,14 @@ import bcrypt from "bcrypt";
 
 const prisma = new PrismaClient();
 
-export const resetPassword = async (req: Request, res: Response): Promise<void> => {
+export const resetPassword = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
   const { email, newPassword, otp } = req.body;
 
   try {
-    // Step 1: Check if user exists
+    // Step 1
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user) {
       res.status(404).json({
@@ -16,13 +19,13 @@ export const resetPassword = async (req: Request, res: Response): Promise<void> 
         code: "USER_NOT_FOUND",
         message: "User does not exist.",
       });
-      return;  // Ensure control returns after the response
+      return;
     }
 
-    // Step 2: Verify OTP
+    // Step 2
     const otpRecord = await prisma.otp.findFirst({
       where: { email, otp },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
     });
 
     if (!otpRecord) {
@@ -31,7 +34,7 @@ export const resetPassword = async (req: Request, res: Response): Promise<void> 
         code: "INVALID_OTP",
         message: "Invalid OTP.",
       });
-      return;  // Ensure control returns after the response
+      return;
     }
 
     // Step 3: Check if OTP has expired
@@ -43,20 +46,20 @@ export const resetPassword = async (req: Request, res: Response): Promise<void> 
         code: "OTP_EXPIRED",
         message: "OTP has expired.",
       });
-      return;  // Ensure control returns after the response
+      return;
     }
 
-    // Step 4: Hash the new password
+    // Step 4
     const saltRounds = 10;
     const hashedPass = await bcrypt.hash(newPassword, saltRounds);
 
-    // Step 5: Update the user password
+    // Step 5
     await prisma.user.update({
       where: { email },
       data: { password: hashedPass },
     });
 
-    // Step 6: Optionally delete OTP record after successful password reset
+    // Step 6
     await prisma.otp.deleteMany({ where: { email } });
 
     res.status(200).json({
