@@ -17,18 +17,16 @@ const client_1 = require("@prisma/client");
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const bcrypt_1 = __importDefault(require("bcrypt"));
 const dotenv_1 = __importDefault(require("dotenv"));
-const generateAccessToken_1 = require("./generateAccessToken"); // Ensure this function is correctly implemented
+const generateAccessToken_1 = require("./generateAccessToken");
 dotenv_1.default.config();
 const prisma = new client_1.PrismaClient();
 const saltRounds = 10;
-// Check if a user exists based on a specific field
 const isUserExist = (field) => __awaiter(void 0, void 0, void 0, function* () {
     return yield prisma.user.findUnique({ where: field });
 });
 const createUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { email, password, name } = req.body; // 'name' instead of 'username'
+    const { email, password, name } = req.body;
     try {
-        // Check if user already exists
         const existingUser = yield isUserExist({ email });
         if (existingUser) {
             res.status(409).json({
@@ -38,9 +36,7 @@ const createUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
             });
             return;
         }
-        // Hash the password before saving
         const hashedPass = yield bcrypt_1.default.hash(password, saltRounds);
-        // Create new user and profile
         const newUser = yield prisma.user.create({
             data: {
                 email,
@@ -48,17 +44,15 @@ const createUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
                 name,
                 profile: {
                     create: {
-                        image: "", // Default or empty image
-                        about: "", // Optionally, allow this to be optional or passed in
+                        image: "",
+                        about: "",
                     },
                 },
             },
         });
         // Handle JWT Token creation
-        const refreshToken = jsonwebtoken_1.default.sign({ userId: newUser.id }, process.env.REFRESH_TOKEN_SECRET || "default_secret", // Ensure the secret is set in env
-        { expiresIn: "24h" });
-        const accessToken = (0, generateAccessToken_1.generateAccessToken)(newUser.id.toString()); // Ensure this function works
-        // Respond with success message and tokens
+        const refreshToken = jsonwebtoken_1.default.sign({ userId: newUser.id }, process.env.REFRESH_TOKEN_SECRET || "default_secret", { expiresIn: "24h" });
+        const accessToken = (0, generateAccessToken_1.generateAccessToken)(newUser.id.toString());
         res.status(201).json({
             success: true,
             code: "SUCCESS",
@@ -79,9 +73,8 @@ const createUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
 exports.createUser = createUser;
 const fetchUsers = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        // Fetch all users' basic information
         const users = yield prisma.user.findMany({
-            select: { id: true, email: true, name: true }, // Select the necessary fields
+            select: { id: true, email: true, name: true },
         });
         res.json({
             success: true,

@@ -5,6 +5,10 @@
     "strict": true,
     "typeRoots": ["./node_modules/@types"],
     "esModuleInterop": true,
+    "moduleResolution": "node",
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
     "outDir": "./dist"
   },
   "include": ["src"]

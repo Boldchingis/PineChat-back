@@ -20,15 +20,13 @@ const nodemailer_1 = __importDefault(require("nodemailer"));
 const dotenv_1 = __importDefault(require("dotenv"));
 dotenv_1.default.config();
 const prisma = new client_1.PrismaClient();
-// ✅ Rate Limiter (3 OTP requests per 5 minutes per email)
 const otpLimiter = (0, express_rate_limit_1.default)({
     windowMs: 5 * 60 * 1000,
     max: 3,
-    keyGenerator: (req) => req.body.email, // ✅ Limit by email instead of IP
+    keyGenerator: (req) => req.body.email,
     message: "Too many OTP requests. Please try again later.",
 });
 exports.otpLimiter = otpLimiter;
-// ✅ Nodemailer Transporter
 const transporter = nodemailer_1.default.createTransport({
     service: "Gmail",
     host: "smtp.gmail.com",
@@ -39,9 +37,7 @@ const transporter = nodemailer_1.default.createTransport({
         pass: process.env.EMAIL_PASS,
     },
 });
-// ✅ Generate a secure OTP
 const generateOtp = () => Math.floor(100000 + Math.random() * 900000);
-// ✅ Function to clean expired OTPs every hour
 const cleanupExpiredOtps = () => __awaiter(void 0, void 0, void 0, function* () {
     try {
         yield prisma.otp.deleteMany({
@@ -54,8 +50,7 @@ const cleanupExpiredOtps = () => __awaiter(void 0, void 0, void 0, function* () 
         console.error("Error cleaning up expired OTPs:", error);
     }
 });
-setInterval(cleanupExpiredOtps, 60 * 60 * 1000); // Run every hour
-// ✅ Forgot Password (Send OTP)
+setInterval(cleanupExpiredOtps, 60 * 60 * 1000);
 const forgotPassword = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { email } = req.body;
     try {
@@ -71,7 +66,12 @@ const forgotPassword = (req, res) => __awaiter(void 0, void 0, void 0, function*
         const otp = generateOtp();
         const hashedOtp = yield bcrypt_1.default.hash(otp.toString(), 10);
         yield prisma.otp.create({
-            data: { email, otp: hashedOtp, createdAt: new Date(), expiresAt: new Date(Date.now() + 5 * 60000) },
+            data: {
+                email,
+                otp: hashedOtp,
+                createdAt: new Date(),
+                expiresAt: new Date(Date.now() + 5 * 60000),
+            },
         });
         yield transporter.sendMail({
             from: '"PineChat" <noreply@pinechat.com>',
@@ -117,9 +117,8 @@ const verifyOTP = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
             });
             return;
         }
-        // ✅ Check if OTP has expired
         if (otpRecord.expiresAt < new Date()) {
-            yield prisma.otp.deleteMany({ where: { email } }); // ✅ Ensure expired OTPs are deleted
+            yield prisma.otp.deleteMany({ where: { email } });
             res.status(400).json({
                 code: "OTP_EXPIRED",
                 message: "OTP has expired",
@@ -127,7 +126,6 @@ const verifyOTP = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
             });
             return;
         }
-        // ✅ Validate OTP
         const isOtpValid = yield bcrypt_1.default.compare(userOtp.toString(), otpRecord.otp);
         if (!isOtpValid) {
             res.status(400).json({
@@ -137,7 +135,6 @@ const verifyOTP = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
             });
             return;
         }
-        // ✅ Delete OTP after successful verification
         yield prisma.otp.deleteMany({ where: { email } });
         res.json({
             code: "OTP_VERIFIED",

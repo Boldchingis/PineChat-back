@@ -32,10 +32,9 @@ const prisma = new client_1.PrismaClient();
 const signinController = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { email, password } = req.body;
     try {
-        // Check if the user exists
         const user = yield prisma.user.findUnique({
             where: { email },
-            include: { profile: true }, // Removed bankCard from include
+            include: { profile: true },
         });
         if (!user) {
             res.status(404).json({
@@ -45,7 +44,6 @@ const signinController = (req, res) => __awaiter(void 0, void 0, void 0, functio
             });
             return;
         }
-        // Compare passwords
         const isValid = yield bcrypt_1.default.compare(password, user.password);
         if (!isValid) {
             res.status(401).json({
@@ -55,7 +53,6 @@ const signinController = (req, res) => __awaiter(void 0, void 0, void 0, functio
             });
             return;
         }
-        // Generate tokens
         const refreshToken = jsonwebtoken_1.default.sign({ userId: user.id }, process.env.REFRESH_TOKEN_SECRET || "default_refresh_secret", { expiresIn: "24h" });
         const accessToken = (0, generateAccessToken_1.generateAccessToken)(user.id.toString());
         const { password: _ } = user, userWithoutPassword = __rest(user, ["password"]);

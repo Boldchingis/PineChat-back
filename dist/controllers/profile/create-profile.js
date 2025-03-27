@@ -13,9 +13,8 @@ exports.createProfile = void 0;
 const client_1 = require("@prisma/client");
 const prisma = new client_1.PrismaClient();
 const createProfile = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    const userId = parseInt(req.params.id); // user ID from params
+    const userId = parseInt(req.params.id);
     if (isNaN(userId)) {
-        // Sending response directly, no return needed
         res.status(400).json({
             success: false,
             code: "INVALID_USER_ID",
@@ -24,7 +23,6 @@ const createProfile = (req, res, next) => __awaiter(void 0, void 0, void 0, func
         return;
     }
     const { image, about } = req.body;
-    // Validate the presence of the profile image
     if (!image) {
         res.status(400).json({
             success: false,
@@ -34,12 +32,10 @@ const createProfile = (req, res, next) => __awaiter(void 0, void 0, void 0, func
         return;
     }
     try {
-        // Check if the user exists
         const user = yield prisma.user.findUnique({
             where: { id: userId },
         });
         if (!user) {
-            // If user not found, send error response
             res.status(404).json({
                 success: false,
                 code: "USER_NOT_FOUND",
@@ -47,7 +43,6 @@ const createProfile = (req, res, next) => __awaiter(void 0, void 0, void 0, func
             });
             return;
         }
-        // Create the new profile
         const newProfile = yield prisma.profile.create({
             data: {
                 image,
@@ -55,7 +50,6 @@ const createProfile = (req, res, next) => __awaiter(void 0, void 0, void 0, func
                 userId,
             },
         });
-        // Sending the successful response directly
         res.status(201).json({
             success: true,
             code: "PROFILE_CREATED_SUCCESSFULLY",
@@ -64,7 +58,6 @@ const createProfile = (req, res, next) => __awaiter(void 0, void 0, void 0, func
         });
     }
     catch (error) {
-        // Pass the error to the next middleware (error handler)
         next(error);
     }
 });
