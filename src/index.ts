@@ -11,12 +11,10 @@ app.use(cors());
 app.use(express.json());
 app.use(
   cors({
-    origin: [
-      "http://localhost:5000",
-    ],
-    credentials: true,  
+    origin: ["http://localhost:5000"],
+    credentials: true,
   })
-)
+);
 // Annotating the types of req and res
 app.get("/", (req: Request, res: Response) => {
   res.send("Server is running...");
