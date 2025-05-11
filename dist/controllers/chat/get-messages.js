@@ -9,28 +9,21 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.createMessage = void 0;
+exports.getMessages = void 0;
 const client_1 = require("@prisma/client");
 const prisma = new client_1.PrismaClient();
-const createMessage = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const getMessages = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { chatId } = req.params;
-        const { content } = req.body;
-        const senderId = req.userId;
-        if (!content || !chatId) {
-            res.status(400).json({
-                success: false,
-                code: "INVALID_REQUEST",
-                message: "Message content and chat ID are required",
-            });
-            return;
-        }
+        const { limit = 50, before } = req.query;
+        const userId = req.userId;
+        // Check if the chat exists and the user is a participant
         const chat = yield prisma.chat.findFirst({
             where: {
                 id: parseInt(chatId),
                 participants: {
                     some: {
-                        id: senderId,
+                        id: userId,
                     },
                 },
             },
@@ -43,12 +36,19 @@ const createMessage = (req, res) => __awaiter(void 0, void 0, void 0, function* 
             });
             return;
         }
-        const newMessage = yield prisma.message.create({
-            data: {
-                content,
-                chat: { connect: { id: parseInt(chatId) } },
-                sender: { connect: { id: senderId } },
-            },
+        // Build the query
+        let whereCondition = {
+            chatId: parseInt(chatId),
+        };
+        // Add pagination based on message ID
+        if (before) {
+            whereCondition.id = {
+                lt: parseInt(before),
+            };
+        }
+        // Fetch messages
+        const messages = yield prisma.message.findMany({
+            where: whereCondition,
             include: {
                 sender: {
                     select: {
@@ -59,16 +59,26 @@ const createMessage = (req, res) => __awaiter(void 0, void 0, void 0, function* 
                     },
                 },
             },
+            orderBy: {
+                createdAt: "desc",
+            },
+            take: Number(limit),
         });
-        res.status(201).json({
+        // Return messages in chronological order (oldest first)
+        const sortedMessages = [...messages].reverse();
+        res.status(200).json({
             success: true,
-            code: "MESSAGE_CREATED",
-            message: "Message created successfully",
-            data: newMessage,
+            code: "MESSAGES_FETCHED",
+            message: "Messages fetched successfully",
+            data: sortedMessages,
+            pagination: {
+                hasMore: messages.length === Number(limit),
+                nextCursor: messages.length > 0 ? messages[messages.length - 1].id : null,
+            },
         });
     }
     catch (error) {
-        console.error("Error creating message:", error);
+        console.error("Error fetching messages:", error);
         res.status(500).json({
             success: false,
             code: "SERVER_ERROR",
@@ -76,4 +86,4 @@ const createMessage = (req, res) => __awaiter(void 0, void 0, void 0, function* 
         });
     }
 });
-exports.createMessage = createMessage;
+exports.getMessages = getMessages;

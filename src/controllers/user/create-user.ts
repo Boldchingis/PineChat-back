@@ -4,6 +4,8 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 import dotenv from "dotenv";
 import { generateAccessToken } from "./generateAccessToken";
+import algoliaService from "../../services/algolia";
+
 dotenv.config();
 const prisma = new PrismaClient();
 const saltRounds = 10;
@@ -28,6 +30,7 @@ export const createUser = async (
       });
       return;
     }
+
     const hashedPass = await bcrypt.hash(password, saltRounds);
     const newUser = await prisma.user.create({
       data: {
@@ -41,9 +44,11 @@ export const createUser = async (
           },
         },
       },
+      include: {
+        profile: true,
+      },
     });
 
-    // Handle JWT Token creation
     const refreshToken = jwt.sign(
       { userId: newUser.id },
       process.env.REFRESH_TOKEN_SECRET || "default_secret",
@@ -51,6 +56,13 @@ export const createUser = async (
     );
 
     const accessToken = generateAccessToken(newUser.id.toString());
+
+    // Include createdAt manually since it's used in Algolia index
+    await algoliaService.indexUser({
+      ...newUser,
+      createdAt: new Date(),
+    });
+
     res.status(201).json({
       success: true,
       code: "SUCCESS",
@@ -60,31 +72,6 @@ export const createUser = async (
     });
   } catch (error) {
     console.error("Error creating user:", error);
-    res.status(500).json({
-      success: false,
-      code: "SERVER_ERROR",
-      message: "Internal server error",
-    });
-  }
-};
-
-export const fetchUsers = async (
-  req: Request,
-  res: Response
-): Promise<void> => {
-  try {
-    const users = await prisma.user.findMany({
-      select: { id: true, email: true, name: true },
-    });
-
-    res.json({
-      success: true,
-      code: "FETCH_SUCCESS",
-      message: "Users fetched successfully",
-      data: users,
-    });
-  } catch (error) {
-    console.error("Error fetching users:", error);
     res.status(500).json({
       success: false,
       code: "SERVER_ERROR",

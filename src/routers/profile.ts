@@ -1,10 +1,13 @@
-// routes/profile.ts
 import express from "express";
-import { createProfile } from "../controllers/profile/create-profile";
+import { createProfile, updateProfile } from "../controllers/profile/create-profile";
+import { getProfile } from "../controllers/profile/get-profile";
+import { verify } from "../middleware";
 
 const router = express.Router();
 
-// Route to create profile
-router.post("/create-profile", createProfile);
+router.use(verify);
+router.post("/create", createProfile);
+router.get("/", getProfile);
+router.put("/update", updateProfile);
 
 export default router;

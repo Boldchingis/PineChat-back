@@ -8,13 +8,13 @@ export const createProfile = async (
   res: Response,
   next: NextFunction
 ): Promise<void> => {
-  const userId = parseInt(req.params.id);
+  const userId = (req as any).userId;
 
-  if (isNaN(userId)) {
-    res.status(400).json({
+  if (!userId) {
+    res.status(401).json({
       success: false,
-      code: "INVALID_USER_ID",
-      message: "User ID must be a valid number.",
+      code: "UNAUTHORIZED",
+      message: "Authentication required.",
     });
     return;
   }
@@ -32,6 +32,7 @@ export const createProfile = async (
   try {
     const user = await prisma.user.findUnique({
       where: { id: userId },
+      include: { profile: true },
     });
 
     if (!user) {
@@ -42,20 +43,129 @@ export const createProfile = async (
       });
       return;
     }
-    const newProfile = await prisma.profile.create({
+
+    let profile;
+
+    if (user.profile) {
+      profile = await prisma.profile.update({
+        where: { id: user.profile.id },
+        data: { image, about },
+      });
+
+      res.status(200).json({
+        success: true,
+        code: "PROFILE_UPDATED",
+        message: "Profile updated successfully.",
+        data: profile,
+      });
+    } else {
+      profile = await prisma.profile.create({
+        data: {
+          image,
+          about: about || "",
+          userId,
+        },
+      });
+
+      res.status(201).json({
+        success: true,
+        code: "PROFILE_CREATED",
+        message: "Profile created successfully.",
+        data: profile,
+      });
+    }
+  } catch (error) {
+    console.error("Error creating/updating profile:", error);
+    res.status(500).json({
+      success: false,
+      code: "SERVER_ERROR",
+      message: "Internal server error",
+    });
+  }
+};
+
+export const updateProfile = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  const userId = (req as any).userId;
+
+  if (!userId) {
+    res.status(401).json({
+      success: false,
+      code: "UNAUTHORIZED",
+      message: "Authentication required.",
+    });
+    return;
+  }
+
+  const { name, image, about } = req.body;
+
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { profile: true },
+    });
+
+    if (!user) {
+      res.status(404).json({
+        success: false,
+        code: "USER_NOT_FOUND",
+        message: "User not found.",
+      });
+      return;
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      let updatedUser = user;
+
+      if (name) {
+        updatedUser = await tx.user.update({
+          where: { id: userId },
+          data: { name },
+          include: { profile: true }, // ✅ ensure profile is included
+        });
+      }
+
+      let profile = user.profile;
+      if ((image || about !== undefined) && profile) {
+        profile = await tx.profile.update({
+          where: { id: profile.id },
+          data: {
+            ...(image && { image }),
+            ...(about !== undefined && { about }),
+          },
+        });
+      } else if (image || about !== undefined) {
+        profile = await tx.profile.create({
+          data: {
+            image: image || "",
+            about: about || "",
+            userId,
+          },
+        });
+      }
+
+      return { user: updatedUser, profile };
+    });
+
+    const { password, ...userWithoutPassword } = result.user;
+
+    res.status(200).json({
+      success: true,
+      code: "PROFILE_UPDATED",
+      message: "Profile updated successfully.",
       data: {
-        image,
-        about,
-        userId,
+        ...userWithoutPassword,
+        profile: result.profile,
       },
     });
-    res.status(201).json({
-      success: true,
-      code: "PROFILE_CREATED_SUCCESSFULLY",
-      message: "Profile created successfully.",
-      data: newProfile,
-    });
   } catch (error) {
-    next(error);
+    console.error("Error updating profile:", error);
+    res.status(500).json({
+      success: false,
+      code: "SERVER_ERROR",
+      message: "Internal server error",
+    });
   }
 };

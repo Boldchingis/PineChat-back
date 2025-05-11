@@ -6,7 +6,6 @@ import { resetPassword } from "../controllers/user/reset-password";
 
 export const userRouter = Router();
 
-// User routes
 userRouter.post("/sign-in", signinController);
 userRouter.post("/forgot-password", forgotPassword);
 userRouter.post("/reset-password", resetPassword);

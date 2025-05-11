@@ -9,29 +9,46 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.createMessage = void 0;
+exports.getChatById = void 0;
 const client_1 = require("@prisma/client");
 const prisma = new client_1.PrismaClient();
-const createMessage = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const getChatById = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
     try {
         const { chatId } = req.params;
-        const { content } = req.body;
-        const senderId = req.userId;
-        if (!content || !chatId) {
+        const userId = req.userId;
+        if (!chatId) {
             res.status(400).json({
                 success: false,
                 code: "INVALID_REQUEST",
-                message: "Message content and chat ID are required",
+                message: "Chat ID is required",
             });
             return;
         }
+        // Check if the user is a participant in this chat
         const chat = yield prisma.chat.findFirst({
             where: {
                 id: parseInt(chatId),
                 participants: {
                     some: {
-                        id: senderId,
+                        id: userId,
                     },
+                },
+            },
+            include: {
+                participants: {
+                    select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                        profile: true,
+                    },
+                },
+                messages: {
+                    orderBy: {
+                        createdAt: "desc",
+                    },
+                    take: 20,
                 },
             },
         });
@@ -43,32 +60,25 @@ const createMessage = (req, res) => __awaiter(void 0, void 0, void 0, function* 
             });
             return;
         }
-        const newMessage = yield prisma.message.create({
-            data: {
-                content,
-                chat: { connect: { id: parseInt(chatId) } },
-                sender: { connect: { id: senderId } },
-            },
-            include: {
-                sender: {
-                    select: {
-                        id: true,
-                        name: true,
-                        email: true,
-                        profile: true,
-                    },
-                },
-            },
-        });
-        res.status(201).json({
+        // Format the response
+        let formattedChat = chat;
+        // For direct chats, set the display name to the other participant's name
+        if (!chat.isGroup && chat.participants.length === 2) {
+            const otherUser = chat.participants.find(p => p.id !== userId);
+            formattedChat = Object.assign(Object.assign({}, chat), { displayName: (otherUser === null || otherUser === void 0 ? void 0 : otherUser.name) || "Unknown User", picture: ((_a = otherUser === null || otherUser === void 0 ? void 0 : otherUser.profile) === null || _a === void 0 ? void 0 : _a.image) || null });
+        }
+        else {
+            formattedChat = Object.assign(Object.assign({}, chat), { displayName: chat.name, picture: null });
+        }
+        res.status(200).json({
             success: true,
-            code: "MESSAGE_CREATED",
-            message: "Message created successfully",
-            data: newMessage,
+            code: "CHAT_FETCHED",
+            message: "Chat fetched successfully",
+            data: formattedChat,
         });
     }
     catch (error) {
-        console.error("Error creating message:", error);
+        console.error("Error fetching chat:", error);
         res.status(500).json({
             success: false,
             code: "SERVER_ERROR",
@@ -76,4 +86,4 @@ const createMessage = (req, res) => __awaiter(void 0, void 0, void 0, function* 
         });
     }
 });
-exports.createMessage = createMessage;
+exports.getChatById = getChatById;

@@ -25,6 +25,7 @@ const createMessage = (req, res) => __awaiter(void 0, void 0, void 0, function* 
             });
             return;
         }
+        // Check if the chat exists and the user is a participant
         const chat = yield prisma.chat.findFirst({
             where: {
                 id: parseInt(chatId),
@@ -43,6 +44,7 @@ const createMessage = (req, res) => __awaiter(void 0, void 0, void 0, function* 
             });
             return;
         }
+        // Create the message
         const newMessage = yield prisma.message.create({
             data: {
                 content,
@@ -60,12 +62,18 @@ const createMessage = (req, res) => __awaiter(void 0, void 0, void 0, function* 
                 },
             },
         });
+        // Update the chat's last activity time
+        yield prisma.chat.update({
+            where: { id: parseInt(chatId) },
+            data: { updatedAt: new Date() },
+        });
         res.status(201).json({
             success: true,
             code: "MESSAGE_CREATED",
             message: "Message created successfully",
             data: newMessage,
         });
+        // Note: Real-time notification will be handled by Socket.io separately
     }
     catch (error) {
         console.error("Error creating message:", error);
